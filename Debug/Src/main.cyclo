@@ -1,0 +1,9 @@
+../Src/main.c:64:6:MPU6050_Init	2
+../Src/main.c:100:7:MPU6050_Read_Accel_X	1
+../Src/main.c:126:7:MPU6050_Read_Accel_Y	1
+../Src/main.c:140:7:MPU6050_Read_Accel_Z	1
+../Src/main.c:156:5:main	1
+../Src/main.c:221:6:SystemClock_Config	3
+../Src/main.c:258:13:MX_I2C1_Init	2
+../Src/main.c:292:13:MX_GPIO_Init	1
+../Src/main.c:315:6:Error_Handler	1

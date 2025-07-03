@@ -7707,7 +7707,7 @@ float MPU6050_Read_Accel_X (void)
 	// Then 0x3B+"2" is YOUT_H, 0x3B+"3" is YOUT_L
 	//int16_t Accel_Y_RAW = (int16_t)(Rec_Data[2] << 8 | Rec_Data [3]);
 	//int16_t Accel_Z_RAW = (int16_t)(Rec_Data[4] << 8 | Rec_Data [5]);
-	float Ax = (float)Accel_X_RAW/16384.0;
+	float Ax = (float)Accel_X_RAW/16384.0; //16384 is g between +-2g, for example 2048 is +-16g
  800341c:	f9b7 300e 	ldrsh.w	r3, [r7, #14]
  8003420:	4618      	mov	r0, r3
  8003422:	f7fd fbeb 	bl	8000bfc <__aeabi_i2f>
@@ -7717,6 +7717,8 @@ float MPU6050_Read_Accel_X (void)
  800342e:	f7fd fced 	bl	8000e0c <__aeabi_fdiv>
  8003432:	4603      	mov	r3, r0
  8003434:	60bb      	str	r3, [r7, #8]
+	//float Ay = (float)Accel_Y_RAW/16384.0;
+	//float Az = (float)Accel_Z_RAW/16384.0;
 	return Ax;
  8003436:	68bb      	ldr	r3, [r7, #8]
 }

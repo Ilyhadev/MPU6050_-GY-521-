@@ -1,9 +1,9 @@
 ../Src/main.c:64:6:MPU6050_Init	32	static
 ../Src/main.c:100:7:MPU6050_Read_Accel_X	40	static
-../Src/main.c:126:7:MPU6050_Read_Accel_Y	40	static
-../Src/main.c:140:7:MPU6050_Read_Accel_Z	40	static
-../Src/main.c:156:5:main	112	static
-../Src/main.c:221:6:SystemClock_Config	72	static
-../Src/main.c:258:13:MX_I2C1_Init	8	static
-../Src/main.c:292:13:MX_GPIO_Init	16	static
-../Src/main.c:315:6:Error_Handler	4	static,ignoring_inline_asm
+../Src/main.c:128:7:MPU6050_Read_Accel_Y	40	static
+../Src/main.c:142:7:MPU6050_Read_Accel_Z	40	static
+../Src/main.c:158:5:main	112	static
+../Src/main.c:223:6:SystemClock_Config	72	static
+../Src/main.c:260:13:MX_I2C1_Init	8	static
+../Src/main.c:294:13:MX_GPIO_Init	16	static
+../Src/main.c:317:6:Error_Handler	4	static,ignoring_inline_asm

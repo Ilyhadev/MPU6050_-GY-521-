@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "fonts.h"
 #include "ssd1306.h"
+#include "mpu6050.h"
 #include <stdio.h>
 /* USER CODE END Includes */
 
@@ -58,9 +59,7 @@ static void MX_I2C1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define MPU6050_ADDR 0x68 << 1 // 0xD0
-#define GYRO_CONFIG_REG 0x1B
-#define ACCEL_CONFIG_REG 0x1C
+
 
 /* USER CODE END 0 */
 
@@ -95,33 +94,42 @@ int main(void)
   MX_GPIO_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
-  MPU6050_Init();
+  mpu6050_t mpu6050;
+  MPU6050_Init(&mpu6050, &hi2c1);
   SSD1306_Init();
-  /* USER CODE END 2 */
 
+  // Proper FIFO initialization sequence
+  HAL_Delay(100); // Allow sensor to stabilize
+  MPU6050_Reset_FIFO(&hi2c1);
+  HAL_Delay(50);
+  MPU6050_configure_Fifo(&hi2c1);
+  HAL_Delay(50);
+  MPU6050_Enable_FIFO(&hi2c1);
+  HAL_Delay(100); // Allow FIFO to fill
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
 	  SSD1306_Fill(0);
 	  char buf[100];
+	  MPU6050_Read_Fifo(&mpu6050, &hi2c1);
 
 
 	  SSD1306_GotoXY (0,0);
-	  sprintf (buf, "Ax=%.2f ", MPU6050_Read_Accel_X());
+	  sprintf (buf, "Ax=%.2f ", mpu6050.accelerometer.Ax);
 	  SSD1306_Puts (buf, &Font_14x15, 1);
 
 	  SSD1306_GotoXY (0,20);
 	  strcpy(buf, "");
-	  sprintf (buf, "Ay=%.2f ", MPU6050_Read_Accel_Y());
+	  sprintf (buf, "Ay=%.2f ", mpu6050.accelerometer.Ay);
 	  SSD1306_Puts (buf, &Font_14x15, 1);
 
 	  SSD1306_GotoXY (0,40);
 	  strcpy(buf, "");
-	  sprintf (buf, "Az=%.2f ", MPU6050_Read_Accel_Z());
+	  sprintf (buf, "Az=%.2f ", mpu6050.accelerometer.Az);
 	  SSD1306_Puts (buf, &Font_14x15, 1);
 	  SSD1306_UpdateScreen();
-	  HAL_Delay(10);
+	  HAL_Delay(1);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

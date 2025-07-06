@@ -74,12 +74,13 @@ void MPU6050_Configure_DLPF(I2C_HandleTypeDef *hi2c1, uint8_t dlpf_value)
 }
 
 void MPU6050_Reset_FIFO(I2C_HandleTypeDef *hi2c1) {
-    uint8_t current_value;
+    uint8_t current_value = 0x00;
 
     // Read current USER_CTRL register
     HAL_I2C_Mem_Read(hi2c1, MPU6050_ADDR, USER_CTRL, 1, &current_value, 1, 1000);
 
     // Disable FIFO
+    // In that way we remember what registers were on previously and "switch" only one bit
     current_value &= ~0x40; // Clear FIFO_EN bit
     HAL_I2C_Mem_Write(hi2c1, MPU6050_ADDR, USER_CTRL, 1, &current_value, 1, 1000);
     HAL_Delay(1);
@@ -90,15 +91,16 @@ void MPU6050_Reset_FIFO(I2C_HandleTypeDef *hi2c1) {
     HAL_Delay(1);
 
     // Clear reset bit and re-enable FIFO
+    // Here after we reseted FIFO we set this bit to 0 again but "remembering"  what value was stored
     current_value &= ~0x04; // Clear FIFO_RESET bit
     current_value |= 0x40;  // Set FIFO_EN bit
     HAL_I2C_Mem_Write(hi2c1, MPU6050_ADDR, USER_CTRL, 1, &current_value, 1, 1000);
 }
 
-float MPU6050_Read_Accel_X (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1)
+float MPU6050_Read_Accel_X (mpu6050_t *mpu6050)
 {
 	uint8_t Rec_Data[2];
-
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
 	// Read 6 BYTES of data starting from ACCEL_XOUT_H (0x3B) register
 	HAL_I2C_Mem_Read (hi2c1, MPU6050_ADDR, ACCEL_XOUT_H, 1, Rec_Data, 2, 1000);
 
@@ -121,10 +123,10 @@ float MPU6050_Read_Accel_X (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1)
 }
 
 
-float MPU6050_Read_Accel_Y (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1)
+float MPU6050_Read_Accel_Y (mpu6050_t *mpu6050)
 {
 	uint8_t Rec_Data[2];
-
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
 	HAL_I2C_Mem_Read (hi2c1, MPU6050_ADDR, ACCEL_YOUT_H, 1, Rec_Data, 2, 1000);
 	int16_t Accel_Y_RAW = (int16_t)(Rec_Data[0] << 8 | Rec_Data [1]);
 	float Ay = (float)Accel_Y_RAW/LSB_SENSITIVITY_ACC;
@@ -132,10 +134,10 @@ float MPU6050_Read_Accel_Y (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1)
 	return Ay;
 }
 
-float MPU6050_Read_Accel_Z (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1)
+float MPU6050_Read_Accel_Z (mpu6050_t *mpu6050)
 {
 	uint8_t Rec_Data[2];
-
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
 	HAL_I2C_Mem_Read (hi2c1, MPU6050_ADDR, ACCEL_ZOUT_H, 1, Rec_Data, 2, 1000);
 	int16_t Accel_Z_RAW = (int16_t)(Rec_Data[0] << 8 | Rec_Data [1]);
 	float Az = (float)Accel_Z_RAW/LSB_SENSITIVITY_ACC;
@@ -144,10 +146,10 @@ float MPU6050_Read_Accel_Z (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1)
 }
 
 
-float MPU6050_Read_Gyro_X (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1)
+float MPU6050_Read_Gyro_X (mpu6050_t *mpu6050)
 {
 	uint8_t Rec_Data[2];
-
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
 	HAL_I2C_Mem_Read (hi2c1, MPU6050_ADDR, GYRO_XOUT_H, 1, Rec_Data, 2, 1000);
 	int16_t Gyro_X_RAW = (int16_t)(Rec_Data[0] << 8 | Rec_Data [1]);
 	float Gx = (float)Gyro_X_RAW/LSB_SENSITIVITY_GYRO;
@@ -155,10 +157,10 @@ float MPU6050_Read_Gyro_X (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1)
 	return Gx;
 }
 
-float MPU6050_Read_Gyro_Y (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1)
+float MPU6050_Read_Gyro_Y (mpu6050_t *mpu6050)
 {
 	uint8_t Rec_Data[2];
-
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
 	HAL_I2C_Mem_Read (hi2c1, MPU6050_ADDR, GYRO_YOUT_H, 1, Rec_Data, 2, 1000);
 	int16_t Gyro_Y_RAW = (int16_t)(Rec_Data[0] << 8 | Rec_Data [1]);
 	float Gy = (float)Gyro_Y_RAW/LSB_SENSITIVITY_GYRO;
@@ -167,10 +169,10 @@ float MPU6050_Read_Gyro_Y (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1)
 }
 
 
-float MPU6050_Read_Gyro_Z (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1)
+float MPU6050_Read_Gyro_Z (mpu6050_t *mpu6050)
 {
 	uint8_t Rec_Data[2];
-
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
 	HAL_I2C_Mem_Read (hi2c1, MPU6050_ADDR, GYRO_ZOUT_H, 1, Rec_Data, 2, 1000);
 	int16_t Gyro_Z_RAW = (int16_t)(Rec_Data[0] << 8 | Rec_Data [1]);
 	float Gz = (float)Gyro_Z_RAW/LSB_SENSITIVITY_GYRO;
@@ -209,11 +211,12 @@ uint16_t MPU6050_Get_FIFO_Count (I2C_HandleTypeDef *hi2c1)
     return FIFO_Count;
 }
 
-void MPU6050_Read_Fifo(mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1) {
+void MPU6050_Read_Fifo(mpu6050_t *mpu6050) {
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
+
     uint8_t fifo_buffer[FIFO_SAMPLE_SIZE];
     uint16_t fifo_count = MPU6050_Get_FIFO_Count(hi2c1);
     int16_t raw_data[FIFO_SAMPLE_SIZE / 2];
-
     // Check for FIFO overflow
     if (fifo_count >= 1024) {
         MPU6050_Reset_FIFO(hi2c1);

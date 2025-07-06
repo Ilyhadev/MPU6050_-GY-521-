@@ -112,7 +112,7 @@ int main(void)
   {
 	  SSD1306_Fill(0);
 	  char buf[100];
-	  MPU6050_Read_Fifo(&mpu6050, &hi2c1);
+	  MPU6050_Read_Fifo(&mpu6050);
 
 
 	  SSD1306_GotoXY (0,0);

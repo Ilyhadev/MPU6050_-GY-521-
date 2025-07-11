@@ -66,12 +66,18 @@ typedef struct {
     float Ax;
     float Ay;
     float Az;
+    // For manual six position calibrations
+    float offsetXYZ [3];
+    float scaleXYZ[3];
 } accelerometer_t;
 
 typedef struct {
     float Gx;
     float Gy;
     float Gz;
+    // For manual six position calibrations
+    float offsetXYZ[3];
+    float scaleXYZ[3];
 } gyroscope_t;
 
 typedef struct mpu6050_t {
@@ -84,29 +90,34 @@ typedef struct mpu6050_t {
 
 void MPU6050_Init (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1);
 
+void MPU6050_Set_Accel_Offset_Scale (mpu6050_t *mpu6050, float* offsetXYZ, float* scaleXYZ);
+
+void MPU6050_Set_Gyro_Offset_Scale (mpu6050_t *mpu6050, float* offsetXYZ, float* scaleXYZ);
+
+
 void MPU6050_Configure_DLPF(I2C_HandleTypeDef *hi2c1, uint8_t dlpf_value);
 
-void MPU6050_Reset_FIFO(I2C_HandleTypeDef *hi2c1);
+void MPU6050_Reset_FIFO(mpu6050_t *mpu6050);
 
-float MPU6050_Read_Accel_X (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1);
+float MPU6050_Read_Accel_X (mpu6050_t *mpu6050);
 
-float MPU6050_Read_Accel_Y (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1);
+float MPU6050_Read_Accel_Y (mpu6050_t *mpu6050);
 
-float MPU6050_Read_Accel_Z (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1);
+float MPU6050_Read_Accel_Z (mpu6050_t *mpu6050);
 
-float MPU6050_Read_Gyro_X (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1);
+float MPU6050_Read_Gyro_X (mpu6050_t *mpu6050);
 
-float MPU6050_Read_Gyro_Y (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1);
+float MPU6050_Read_Gyro_Y (mpu6050_t *mpu6050);
 
-float MPU6050_Read_Gyro_Z (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1);
+float MPU6050_Read_Gyro_Z (mpu6050_t *mpu6050);
 
-void MPU6050_Enable_FIFO(I2C_HandleTypeDef *hi2c1);
+void MPU6050_Enable_FIFO(mpu6050_t *mpu6050);
 
-void MPU6050_configure_Fifo (I2C_HandleTypeDef *hi2c1);
+void MPU6050_configure_Fifo (mpu6050_t *mpu6050);
 
-uint16_t MPU6050_Get_FIFO_Count(I2C_HandleTypeDef *hi2c1);
+uint16_t MPU6050_Get_FIFO_Count(mpu6050_t *mpu6050);
 
-void MPU6050_Read_Fifo(mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1);
+void MPU6050_Read_Fifo(mpu6050_t *mpu6050);
 
 
 #endif /* INC_MPU6050_H_ */

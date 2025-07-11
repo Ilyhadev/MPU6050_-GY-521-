@@ -8,7 +8,7 @@
 #include "mpu6050.h"
 #include <stdint.h>
 #include <stdbool.h>
-
+#include <string.h>
 
 
 void MPU6050_Init (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1) // WHO AM I is to verify the identity of device
@@ -57,13 +57,28 @@ void MPU6050_Init (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1) // WHO AM I is 
 	  mpu6050->accelerometer.Ax = 0;
 	  mpu6050->accelerometer.Ay = 0;
 	  mpu6050->accelerometer.Az = 0;
+	  memset(mpu6050->accelerometer.offsetXYZ, 0, 3 * sizeof(float));
+	  memset(mpu6050->accelerometer.scaleXYZ, 1, 3 * sizeof(float));
 
 	  mpu6050->gyroscope.Gx = 0;
 	  mpu6050->gyroscope.Gy = 0;
 	  mpu6050->gyroscope.Gz = 0;
+	  memset(mpu6050->gyroscope.offsetXYZ, 0, 3 * sizeof(float));
+	  memset(mpu6050->gyroscope.scaleXYZ, 1, 3 * sizeof(float));
+
 	  mpu6050->temperature = 0;
 
   }
+}
+
+void MPU6050_Set_Accel_Offset_Scale (mpu6050_t *mpu6050, float* offsetXYZ, float* scaleXYZ) {
+	memcpy(mpu6050->accelerometer.offsetXYZ, offsetXYZ, 3*sizeof(float));
+	memcpy(mpu6050->accelerometer.scaleXYZ, scaleXYZ, 3*sizeof(float));
+}
+
+void MPU6050_Set_Gyro_Offset_Scale (mpu6050_t *mpu6050, float* offsetXYZ, float* scaleXYZ) {
+	memcpy(mpu6050->gyroscope.offsetXYZ, offsetXYZ, 3*sizeof(float));
+	memcpy(mpu6050->gyroscope.scaleXYZ, scaleXYZ, 3*sizeof(float));
 }
 
 void MPU6050_Configure_DLPF(I2C_HandleTypeDef *hi2c1, uint8_t dlpf_value)
@@ -73,9 +88,9 @@ void MPU6050_Configure_DLPF(I2C_HandleTypeDef *hi2c1, uint8_t dlpf_value)
     HAL_I2C_Mem_Write(hi2c1, MPU6050_ADDR, CONFIG, 1, &dlpf_value, 1, 1000);
 }
 
-void MPU6050_Reset_FIFO(I2C_HandleTypeDef *hi2c1) {
+void MPU6050_Reset_FIFO(mpu6050_t *mpu6050) {
     uint8_t current_value = 0x00;
-
+    I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
     // Read current USER_CTRL register
     HAL_I2C_Mem_Read(hi2c1, MPU6050_ADDR, USER_CTRL, 1, &current_value, 1, 1000);
 
@@ -97,6 +112,7 @@ void MPU6050_Reset_FIFO(I2C_HandleTypeDef *hi2c1) {
     HAL_I2C_Mem_Write(hi2c1, MPU6050_ADDR, USER_CTRL, 1, &current_value, 1, 1000);
 }
 
+// TODO: account calibration in readings for each register reading. For now implemented only for FIFO readings
 float MPU6050_Read_Accel_X (mpu6050_t *mpu6050)
 {
 	uint8_t Rec_Data[2];
@@ -180,7 +196,8 @@ float MPU6050_Read_Gyro_Z (mpu6050_t *mpu6050)
 	return Gz;
 }
 
-void MPU6050_Enable_FIFO(I2C_HandleTypeDef *hi2c1) {
+void MPU6050_Enable_FIFO(mpu6050_t *mpu6050) {
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
     uint8_t current_value;
     // Read current USER_CTRL register value
     HAL_I2C_Mem_Read(hi2c1, MPU6050_ADDR, USER_CTRL, 1, &current_value, 1, 1000);
@@ -190,15 +207,17 @@ void MPU6050_Enable_FIFO(I2C_HandleTypeDef *hi2c1) {
     HAL_I2C_Mem_Write(hi2c1, MPU6050_ADDR, USER_CTRL, 1, &current_value, 1, 1000);
 }
 
-void MPU6050_configure_Fifo (I2C_HandleTypeDef *hi2c1) // temperature is first 1, next 111 is enable gyroscope from Gx to Gz, and last 1 is for acceleration (000 is about i2c slaves - not relevant in my case)
+void MPU6050_configure_Fifo (mpu6050_t *mpu6050) // temperature is first 1, next 111 is enable gyroscope from Gx to Gz, and last 1 is for acceleration (000 is about i2c slaves - not relevant in my case)
 {
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
 	uint8_t Data = 0xF8; // To enable fifo on Temperature, gyro and accel (1111 1000)
 	// If want to change Data to read different in FIFO DON'T FORGET to change FIFO_SAMPLE_SIZE in mpu6050.h
 	HAL_I2C_Mem_Write (hi2c1, MPU6050_ADDR, FIFO_ENABLE, 1, &Data, 1, 1000); // 1 byte to transmit
 }
 
-uint16_t MPU6050_Get_FIFO_Count (I2C_HandleTypeDef *hi2c1)
+uint16_t MPU6050_Get_FIFO_Count (mpu6050_t *mpu6050)
 {
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
     uint8_t Data_H, Data_L;
     uint16_t FIFO_Count;
 
@@ -215,11 +234,11 @@ void MPU6050_Read_Fifo(mpu6050_t *mpu6050) {
 	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
 
     uint8_t fifo_buffer[FIFO_SAMPLE_SIZE];
-    uint16_t fifo_count = MPU6050_Get_FIFO_Count(hi2c1);
+    uint16_t fifo_count = MPU6050_Get_FIFO_Count(mpu6050);
     int16_t raw_data[FIFO_SAMPLE_SIZE / 2];
     // Check for FIFO overflow
     if (fifo_count >= 1024) {
-        MPU6050_Reset_FIFO(hi2c1);
+        MPU6050_Reset_FIFO(mpu6050);
         HAL_Delay(100); // Allow time for new data
         return;
     }
@@ -237,18 +256,18 @@ void MPU6050_Read_Fifo(mpu6050_t *mpu6050) {
                                       fifo_buffer[2 * i + 1]);
             }
 
-            mpu6050->accelerometer.Ax = (float)raw_data[0] / LSB_SENSITIVITY_ACC;
-            mpu6050->accelerometer.Ay = (float)raw_data[1] / LSB_SENSITIVITY_ACC;
-            mpu6050->accelerometer.Az = (float)raw_data[2] / LSB_SENSITIVITY_ACC;
+            mpu6050->accelerometer.Ax = (((float)raw_data[0] / LSB_SENSITIVITY_ACC) - mpu6050->accelerometer.offsetXYZ[0])/mpu6050->accelerometer.scaleXYZ[0];
+            mpu6050->accelerometer.Ay = (((float)raw_data[1] / LSB_SENSITIVITY_ACC) - mpu6050->accelerometer.offsetXYZ[1])/mpu6050->accelerometer.scaleXYZ[1];
+            mpu6050->accelerometer.Az = (((float)raw_data[2] / LSB_SENSITIVITY_ACC) - mpu6050->accelerometer.offsetXYZ[2])/mpu6050->accelerometer.scaleXYZ[2];
 
             mpu6050->temperature      = ((float)raw_data[3] / 340.0f) + 36.53f;
 
-            mpu6050->gyroscope.Gx     = (float)raw_data[4] / LSB_SENSITIVITY_GYRO;
-            mpu6050->gyroscope.Gy     = (float)raw_data[5] / LSB_SENSITIVITY_GYRO;
-            mpu6050->gyroscope.Gz     = (float)raw_data[6] / LSB_SENSITIVITY_GYRO;
+            mpu6050->gyroscope.Gx     = (((float)raw_data[4] / LSB_SENSITIVITY_GYRO) - mpu6050->gyroscope.offsetXYZ[0])/mpu6050->gyroscope.scaleXYZ[0];
+            mpu6050->gyroscope.Gy     = (((float)raw_data[5] / LSB_SENSITIVITY_GYRO) - mpu6050->gyroscope.offsetXYZ[1])/mpu6050->gyroscope.scaleXYZ[1];
+            mpu6050->gyroscope.Gz     = (((float)raw_data[6] / LSB_SENSITIVITY_GYRO) - mpu6050->gyroscope.offsetXYZ[2])/mpu6050->gyroscope.scaleXYZ[2];
 
             // Check remaining FIFO count
-            fifo_count = MPU6050_Get_FIFO_Count(hi2c1);
+            fifo_count = MPU6050_Get_FIFO_Count(mpu6050);
         }
     }
 }

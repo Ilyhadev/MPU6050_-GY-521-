@@ -45,6 +45,8 @@
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
 
+UART_HandleTypeDef huart3;
+
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -53,13 +55,14 @@ I2C_HandleTypeDef hi2c1;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_USART3_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+uint8_t config[4] = {0, 0, 0, 0};
 
 /* USER CODE END 0 */
 
@@ -93,19 +96,35 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_I2C1_Init();
+  MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
   mpu6050_t mpu6050;
   MPU6050_Init(&mpu6050, &hi2c1);
   SSD1306_Init();
 
-  // Proper FIFO initialization sequence
+
   HAL_Delay(100); // Allow sensor to stabilize
-  MPU6050_Reset_FIFO(&hi2c1);
+  MPU6050_Reset_FIFO(&mpu6050);
   HAL_Delay(50);
-  MPU6050_configure_Fifo(&hi2c1);
+  MPU6050_configure_Fifo(&mpu6050);
   HAL_Delay(50);
-  MPU6050_Enable_FIFO(&hi2c1);
+  MPU6050_Enable_FIFO(&mpu6050);
   HAL_Delay(100); // Allow FIFO to fill
+
+  float offsetXYZ[3] = {0.01, 0.015, 0.205}; // enter your values
+  float scaleXYZ[3] = {1, 0.995, 1.01}; // enter your values
+  MPU6050_Set_Accel_Offset_Scale(&mpu6050, offsetXYZ, scaleXYZ);
+
+  /*HAL_UART_Transmit(&huart3, (uint8_t*)"Enter 4 config chars:\r\n", 23, 100);
+  HAL_UART_Receive_IT(&huart3, config, 4);
+
+  SSD1306_GotoXY (0,0);
+  char buf[100];
+  sprintf (buf, "conf0=%d ", config[0]);
+  SSD1306_Puts (buf, &Font_14x15, 1);
+  SSD1306_UpdateScreen();*/
+  /* USER CODE END 2 */
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -130,6 +149,7 @@ int main(void)
 	  SSD1306_Puts (buf, &Font_14x15, 1);
 	  SSD1306_UpdateScreen();
 	  HAL_Delay(1);
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -208,6 +228,39 @@ static void MX_I2C1_Init(void)
 }
 
 /**
+  * @brief USART3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART3_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART3_Init 0 */
+
+  /* USER CODE END USART3_Init 0 */
+
+  /* USER CODE BEGIN USART3_Init 1 */
+
+  /* USER CODE END USART3_Init 1 */
+  huart3.Instance = USART3;
+  huart3.Init.BaudRate = 9600;
+  huart3.Init.WordLength = UART_WORDLENGTH_8B;
+  huart3.Init.StopBits = UART_STOPBITS_1;
+  huart3.Init.Parity = UART_PARITY_NONE;
+  huart3.Init.Mode = UART_MODE_TX_RX;
+  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART3_Init 2 */
+
+  /* USER CODE END USART3_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -219,8 +272,8 @@ static void MX_GPIO_Init(void)
   /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
@@ -228,6 +281,20 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+    if (huart->Instance == USART3) {
+        // Echo received config
+        HAL_UART_Transmit(&huart3, (uint8_t*)"Received: ", 10, 100);
+        HAL_UART_Transmit(&huart3, config, 4, 100);
+        HAL_UART_Transmit(&huart3, (uint8_t*)"\r\n", 2, 100);
+
+        // to call interrupt again
+        HAL_UART_Receive_IT(&huart3, config, 4);
+    }
+}
+
+
+
 
 /* USER CODE END 4 */
 

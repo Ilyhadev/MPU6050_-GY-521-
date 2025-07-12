@@ -1,5 +1,10 @@
-../Src/main.c:70:5:main	144	static
-../Src/main.c:144:6:SystemClock_Config	72	static
-../Src/main.c:181:13:MX_I2C1_Init	8	static
-../Src/main.c:215:13:MX_GPIO_Init	16	static
-../Src/main.c:238:6:Error_Handler	4	static,ignoring_inline_asm
+../Src/main.c:90:6:StepCounter_Init	16	static
+../Src/main.c:99:6:StepCounter_Update	32	static
+../Src/main.c:155:10:StepCounter_GetSteps	16	static
+../Src/main.c:164:5:main	208	static
+../Src/main.c:272:6:SystemClock_Config	72	static
+../Src/main.c:309:13:MX_I2C1_Init	8	static
+../Src/main.c:343:13:MX_USART3_UART_Init	8	static
+../Src/main.c:376:13:MX_GPIO_Init	16	static
+../Src/main.c:392:6:HAL_UART_RxCpltCallback	16	static
+../Src/main.c:413:6:Error_Handler	4	static,ignoring_inline_asm

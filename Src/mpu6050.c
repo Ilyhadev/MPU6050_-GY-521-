@@ -8,14 +8,15 @@
 #include "mpu6050.h"
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
 
-
-void MPU6050_Init (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1) // WHO AM I is to verify the identity of device
+mpu6050_t MPU6050_Init (I2C_HandleTypeDef *hi2c1) // WHO AM I is to verify the identity of device
 {
   uint8_t check;
   uint8_t Data;
-  mpu6050->_I2C = hi2c1;
+  mpu6050_t mpu6050 = {0}; // Zero initialise whole struct
+  mpu6050._I2C = hi2c1;
 
   HAL_I2C_Mem_Read (hi2c1, MPU6050_ADDR, WHO_AM_I, 1, &check, 1, 1000);  // read WHO_AM_I
 
@@ -52,18 +53,44 @@ void MPU6050_Init (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1) // WHO AM I is 
 	  // Set Gyroscopic configuration in GYRO_CONFIG Register
 	  Data = 0x00;  // XG_ST=0,YG_ST=0,ZG_ST=0, FS_SEL=0 -> <strong>±</strong> 250 ̐/s
 	  HAL_I2C_Mem_Write(hi2c1, MPU6050_ADDR, GYRO_CONFIG_REG, 1, &Data, 1, 1000);
-	  mpu6050->isInit = true;
 
-	  mpu6050->accelerometer.Ax = 0;
-	  mpu6050->accelerometer.Ay = 0;
-	  mpu6050->accelerometer.Az = 0;
+	  for (int i = 0; i < 3; i++){
+		  mpu6050.accelerometer.scaleXYZ[i] = LSB_SENSITIVITY_ACC_DEFAULT;
+	  }
 
-	  mpu6050->gyroscope.Gx = 0;
-	  mpu6050->gyroscope.Gy = 0;
-	  mpu6050->gyroscope.Gz = 0;
-	  mpu6050->temperature = 0;
+	  for (int i = 0; i < 3; i++){
+		  mpu6050.gyroscope.scaleXYZ[i] = LSB_SENSITIVITY_GYRO_DEFAULT;
+	  }
 
   }
+   return mpu6050;
+}
+
+// For sensitivity calibration
+void MPU6050_Set_LSB_Sensitivity_Accel (mpu6050_t *mpu6050, LSB_Sensitivity_Accel_t value) {
+	// Due to safety purposes i will set every value to scale individually (cast from int to float) - i didn't use memset
+	for (int i = 0; i < 3; i++){
+		mpu6050->accelerometer.scaleXYZ[i] = value;
+	}
+}
+
+// Please use values from header file in comment section near line: #define LSB_SENSITIVITY_GYRO_DEFAULT
+void MPU6050_Set_LSB_Sensitivity_Gyro (mpu6050_t *mpu6050, float value) {
+	for (int i = 0; i < 3; i++){
+		mpu6050->gyroscope.scaleXYZ[i] = value;
+	}
+}
+
+// For six point calibration.
+// Note: scale is the same as for sensitivity calibration. Generally this function is for purpose when user want to put different scales on each axis
+void MPU6050_Set_Accel_Offset_Scale (mpu6050_t *mpu6050, float* offsetXYZ, float* scaleXYZ) {
+	memcpy(mpu6050->accelerometer.offsetXYZ, offsetXYZ, 3*sizeof(float));
+	memcpy(mpu6050->accelerometer.scaleXYZ, scaleXYZ, 3*sizeof(float));
+}
+
+void MPU6050_Set_Gyro_Offset_Scale (mpu6050_t *mpu6050, float* offsetXYZ, float* scaleXYZ) {
+	memcpy(mpu6050->gyroscope.offsetXYZ, offsetXYZ, 3*sizeof(float));
+	memcpy(mpu6050->gyroscope.scaleXYZ, scaleXYZ, 3*sizeof(float));
 }
 
 void MPU6050_Configure_DLPF(I2C_HandleTypeDef *hi2c1, uint8_t dlpf_value)
@@ -73,13 +100,14 @@ void MPU6050_Configure_DLPF(I2C_HandleTypeDef *hi2c1, uint8_t dlpf_value)
     HAL_I2C_Mem_Write(hi2c1, MPU6050_ADDR, CONFIG, 1, &dlpf_value, 1, 1000);
 }
 
-void MPU6050_Reset_FIFO(I2C_HandleTypeDef *hi2c1) {
-    uint8_t current_value;
-
+void MPU6050_Reset_FIFO(mpu6050_t *mpu6050) {
+    uint8_t current_value = 0x00;
+    I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
     // Read current USER_CTRL register
     HAL_I2C_Mem_Read(hi2c1, MPU6050_ADDR, USER_CTRL, 1, &current_value, 1, 1000);
 
     // Disable FIFO
+    // In that way we remember what registers were on previously and "switch" only one bit
     current_value &= ~0x40; // Clear FIFO_EN bit
     HAL_I2C_Mem_Write(hi2c1, MPU6050_ADDR, USER_CTRL, 1, &current_value, 1, 1000);
     HAL_Delay(1);
@@ -90,15 +118,17 @@ void MPU6050_Reset_FIFO(I2C_HandleTypeDef *hi2c1) {
     HAL_Delay(1);
 
     // Clear reset bit and re-enable FIFO
+    // Here after we reseted FIFO we set this bit to 0 again but "remembering"  what value was stored
     current_value &= ~0x04; // Clear FIFO_RESET bit
     current_value |= 0x40;  // Set FIFO_EN bit
     HAL_I2C_Mem_Write(hi2c1, MPU6050_ADDR, USER_CTRL, 1, &current_value, 1, 1000);
 }
 
-float MPU6050_Read_Accel_X (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1)
+
+float MPU6050_Read_Accel_X (mpu6050_t *mpu6050)
 {
 	uint8_t Rec_Data[2];
-
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
 	// Read 6 BYTES of data starting from ACCEL_XOUT_H (0x3B) register
 	HAL_I2C_Mem_Read (hi2c1, MPU6050_ADDR, ACCEL_XOUT_H, 1, Rec_Data, 2, 1000);
 
@@ -114,71 +144,72 @@ float MPU6050_Read_Accel_X (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1)
 	// The same goes for Y and Z
 	// logically as array addressing is organised in C: 0x3B is XOUT_H, 0x3B+"1" is XOUT_L
 	// Then 0x3B+"2" is YOUT_H, 0x3B+"3" is YOUT_L
-	float Ax = (float)Accel_X_RAW/LSB_SENSITIVITY_ACC;
+	float Ax = ((float)Accel_X_RAW - mpu6050->accelerometer.offsetXYZ[0]) / mpu6050->accelerometer.scaleXYZ[0];
 
-	mpu6050->accelerometer.Ax = Ax;
+	mpu6050->accelerometer.Axyz[0] = Ax;
 	return Ax;
 }
 
 
-float MPU6050_Read_Accel_Y (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1)
+float MPU6050_Read_Accel_Y (mpu6050_t *mpu6050)
 {
 	uint8_t Rec_Data[2];
-
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
 	HAL_I2C_Mem_Read (hi2c1, MPU6050_ADDR, ACCEL_YOUT_H, 1, Rec_Data, 2, 1000);
 	int16_t Accel_Y_RAW = (int16_t)(Rec_Data[0] << 8 | Rec_Data [1]);
-	float Ay = (float)Accel_Y_RAW/LSB_SENSITIVITY_ACC;
-	mpu6050->accelerometer.Ay = Ay;
+	float Ay = ((float)Accel_Y_RAW - mpu6050->accelerometer.offsetXYZ[1]) / mpu6050->accelerometer.scaleXYZ[1];
+	mpu6050->accelerometer.Axyz[1] = Ay;
 	return Ay;
 }
 
-float MPU6050_Read_Accel_Z (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1)
+float MPU6050_Read_Accel_Z (mpu6050_t *mpu6050)
 {
 	uint8_t Rec_Data[2];
-
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
 	HAL_I2C_Mem_Read (hi2c1, MPU6050_ADDR, ACCEL_ZOUT_H, 1, Rec_Data, 2, 1000);
 	int16_t Accel_Z_RAW = (int16_t)(Rec_Data[0] << 8 | Rec_Data [1]);
-	float Az = (float)Accel_Z_RAW/LSB_SENSITIVITY_ACC;
-	mpu6050->accelerometer.Az = Az;
+	float Az = ((float)Accel_Z_RAW - mpu6050->accelerometer.offsetXYZ[2]) / mpu6050->accelerometer.scaleXYZ[2];
+	mpu6050->accelerometer.Axyz[2] = Az;
 	return Az;
 }
 
 
-float MPU6050_Read_Gyro_X (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1)
+float MPU6050_Read_Gyro_X (mpu6050_t *mpu6050)
 {
 	uint8_t Rec_Data[2];
-
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
 	HAL_I2C_Mem_Read (hi2c1, MPU6050_ADDR, GYRO_XOUT_H, 1, Rec_Data, 2, 1000);
 	int16_t Gyro_X_RAW = (int16_t)(Rec_Data[0] << 8 | Rec_Data [1]);
-	float Gx = (float)Gyro_X_RAW/LSB_SENSITIVITY_GYRO;
-	mpu6050->gyroscope.Gx = Gx;
+	float Gx = ((float)Gyro_X_RAW - mpu6050->gyroscope.offsetXYZ[0])/mpu6050->gyroscope.scaleXYZ[0];
+	mpu6050->gyroscope.Gxyz[0] = Gx;
 	return Gx;
 }
 
-float MPU6050_Read_Gyro_Y (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1)
+float MPU6050_Read_Gyro_Y (mpu6050_t *mpu6050)
 {
 	uint8_t Rec_Data[2];
-
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
 	HAL_I2C_Mem_Read (hi2c1, MPU6050_ADDR, GYRO_YOUT_H, 1, Rec_Data, 2, 1000);
 	int16_t Gyro_Y_RAW = (int16_t)(Rec_Data[0] << 8 | Rec_Data [1]);
-	float Gy = (float)Gyro_Y_RAW/LSB_SENSITIVITY_GYRO;
-	mpu6050->gyroscope.Gy = Gy;
+	float Gy = ((float)Gyro_Y_RAW - mpu6050->gyroscope.offsetXYZ[1])/mpu6050->gyroscope.scaleXYZ[1];
+	mpu6050->gyroscope.Gxyz[1] = Gy;
 	return Gy;
 }
 
 
-float MPU6050_Read_Gyro_Z (mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1)
+float MPU6050_Read_Gyro_Z (mpu6050_t *mpu6050)
 {
 	uint8_t Rec_Data[2];
-
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
 	HAL_I2C_Mem_Read (hi2c1, MPU6050_ADDR, GYRO_ZOUT_H, 1, Rec_Data, 2, 1000);
 	int16_t Gyro_Z_RAW = (int16_t)(Rec_Data[0] << 8 | Rec_Data [1]);
-	float Gz = (float)Gyro_Z_RAW/LSB_SENSITIVITY_GYRO;
-	mpu6050->gyroscope.Gz = Gz;
+	float Gz = ((float)Gyro_Z_RAW - mpu6050->gyroscope.offsetXYZ[2])/mpu6050->gyroscope.scaleXYZ[2];
+	mpu6050->gyroscope.Gxyz[2] = Gz;
 	return Gz;
 }
 
-void MPU6050_Enable_FIFO(I2C_HandleTypeDef *hi2c1) {
+void MPU6050_Enable_FIFO(mpu6050_t *mpu6050) {
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
     uint8_t current_value;
     // Read current USER_CTRL register value
     HAL_I2C_Mem_Read(hi2c1, MPU6050_ADDR, USER_CTRL, 1, &current_value, 1, 1000);
@@ -188,15 +219,17 @@ void MPU6050_Enable_FIFO(I2C_HandleTypeDef *hi2c1) {
     HAL_I2C_Mem_Write(hi2c1, MPU6050_ADDR, USER_CTRL, 1, &current_value, 1, 1000);
 }
 
-void MPU6050_configure_Fifo (I2C_HandleTypeDef *hi2c1) // temperature is first 1, next 111 is enable gyroscope from Gx to Gz, and last 1 is for acceleration (000 is about i2c slaves - not relevant in my case)
+void MPU6050_configure_Fifo (mpu6050_t *mpu6050) // temperature is first 1, next 111 is enable gyroscope from Gx to Gz, and last 1 is for acceleration (000 is about i2c slaves - not relevant in my case)
 {
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
 	uint8_t Data = 0xF8; // To enable fifo on Temperature, gyro and accel (1111 1000)
 	// If want to change Data to read different in FIFO DON'T FORGET to change FIFO_SAMPLE_SIZE in mpu6050.h
 	HAL_I2C_Mem_Write (hi2c1, MPU6050_ADDR, FIFO_ENABLE, 1, &Data, 1, 1000); // 1 byte to transmit
 }
 
-uint16_t MPU6050_Get_FIFO_Count (I2C_HandleTypeDef *hi2c1)
+uint16_t MPU6050_Get_FIFO_Count (mpu6050_t *mpu6050)
 {
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
     uint8_t Data_H, Data_L;
     uint16_t FIFO_Count;
 
@@ -209,14 +242,15 @@ uint16_t MPU6050_Get_FIFO_Count (I2C_HandleTypeDef *hi2c1)
     return FIFO_Count;
 }
 
-void MPU6050_Read_Fifo(mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1) {
-    uint8_t fifo_buffer[FIFO_SAMPLE_SIZE];
-    uint16_t fifo_count = MPU6050_Get_FIFO_Count(hi2c1);
-    int16_t raw_data[FIFO_SAMPLE_SIZE / 2];
+void MPU6050_Read_Fifo(mpu6050_t *mpu6050) {
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
 
+    uint8_t fifo_buffer[FIFO_SAMPLE_SIZE];
+    uint16_t fifo_count = MPU6050_Get_FIFO_Count(mpu6050);
+    int16_t raw_data[FIFO_SAMPLE_SIZE / 2];
     // Check for FIFO overflow
     if (fifo_count >= 1024) {
-        MPU6050_Reset_FIFO(hi2c1);
+        MPU6050_Reset_FIFO(mpu6050);
         HAL_Delay(100); // Allow time for new data
         return;
     }
@@ -234,18 +268,42 @@ void MPU6050_Read_Fifo(mpu6050_t *mpu6050, I2C_HandleTypeDef *hi2c1) {
                                       fifo_buffer[2 * i + 1]);
             }
 
-            mpu6050->accelerometer.Ax = (float)raw_data[0] / LSB_SENSITIVITY_ACC;
-            mpu6050->accelerometer.Ay = (float)raw_data[1] / LSB_SENSITIVITY_ACC;
-            mpu6050->accelerometer.Az = (float)raw_data[2] / LSB_SENSITIVITY_ACC;
+            for (int i = 0; i < 3; i++) {
+            	mpu6050->accelerometer.Axyz[i] = ((float)raw_data[i] - mpu6050->accelerometer.offsetXYZ[i]) / mpu6050->accelerometer.scaleXYZ[i];
+            }
 
             mpu6050->temperature      = ((float)raw_data[3] / 340.0f) + 36.53f;
 
-            mpu6050->gyroscope.Gx     = (float)raw_data[4] / LSB_SENSITIVITY_GYRO;
-            mpu6050->gyroscope.Gy     = (float)raw_data[5] / LSB_SENSITIVITY_GYRO;
-            mpu6050->gyroscope.Gz     = (float)raw_data[6] / LSB_SENSITIVITY_GYRO;
+            for (int i = 4; i < 7; i++) {
+            	// "[i-4]" due to i beginning from 4 and offsetXYZ being size of 3 float elements
+            	mpu6050->gyroscope.Gxyz[i - 4] = ((float)raw_data[i]- mpu6050->gyroscope.offsetXYZ[i - 4])/mpu6050->gyroscope.scaleXYZ[i - 4];
+            }
+
 
             // Check remaining FIFO count
-            fifo_count = MPU6050_Get_FIFO_Count(hi2c1);
+            fifo_count = MPU6050_Get_FIFO_Count(mpu6050);
         }
     }
+}
+
+int16_t* MPU6050_Get_Raw_Accel (mpu6050_t *mpu6050) {
+	static int16_t resultXYZ[3];
+	uint8_t Rec_Data[6];
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
+	HAL_I2C_Mem_Read (hi2c1, MPU6050_ADDR, ACCEL_XOUT_H, 1, Rec_Data, 6, 1000);
+	resultXYZ [0] = (int16_t)(Rec_Data[0] << 8 | Rec_Data [1]);
+	resultXYZ [1] = (int16_t)(Rec_Data[2] << 8 | Rec_Data [3]);
+	resultXYZ [2] = (int16_t)(Rec_Data[4] << 8 | Rec_Data [5]);
+	return resultXYZ;
+}
+
+int16_t* MPU6050_Get_Raw_Gyro (mpu6050_t *mpu6050) {
+	static  int16_t resultXYZ[3];
+	uint8_t Rec_Data[6];
+	I2C_HandleTypeDef* hi2c1 = mpu6050->_I2C;
+	HAL_I2C_Mem_Read (hi2c1, MPU6050_ADDR, GYRO_XOUT_H, 1, Rec_Data, 6, 1000);
+	resultXYZ [0] = (int16_t)(Rec_Data[0] << 8 | Rec_Data [1]);
+	resultXYZ [1] = (int16_t)(Rec_Data[2] << 8 | Rec_Data [3]);
+	resultXYZ [2] = (int16_t)(Rec_Data[4] << 8 | Rec_Data [5]);
+	return resultXYZ;
 }

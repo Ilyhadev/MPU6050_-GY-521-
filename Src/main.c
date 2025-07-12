@@ -25,6 +25,7 @@
 #include "ssd1306.h"
 #include "mpu6050.h"
 #include <stdio.h>
+#include <math.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -62,7 +63,6 @@ static void MX_USART3_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-uint8_t config[4] = {0, 0, 0, 0};
 
 /* USER CODE END 0 */
 
@@ -98,8 +98,9 @@ int main(void)
   MX_I2C1_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
-  mpu6050_t mpu6050;
-  MPU6050_Init(&mpu6050, &hi2c1);
+  mpu6050_t mpu6050 = MPU6050_Init(&hi2c1);
+  StepCounter step_counter;
+  StepCounter_Init(&step_counter);
   SSD1306_Init();
 
 
@@ -111,44 +112,21 @@ int main(void)
   MPU6050_Enable_FIFO(&mpu6050);
   HAL_Delay(100); // Allow FIFO to fill
 
-  float offsetXYZ[3] = {0.01, 0.015, 0.205}; // enter your values
-  float scaleXYZ[3] = {1, 0.995, 1.01}; // enter your values
+  // To get Raw values for calibration use corresponding functions in driver.
+  float offsetXYZ[3] = {188.75, 240, 3361.5}; // enter your values
+  float scaleXYZ[3] = {16358.75, 16312.67, 16721.5}; // enter your values
   MPU6050_Set_Accel_Offset_Scale(&mpu6050, offsetXYZ, scaleXYZ);
 
-  /*HAL_UART_Transmit(&huart3, (uint8_t*)"Enter 4 config chars:\r\n", 23, 100);
-  HAL_UART_Receive_IT(&huart3, config, 4);
 
-  SSD1306_GotoXY (0,0);
-  char buf[100];
-  sprintf (buf, "conf0=%d ", config[0]);
-  SSD1306_Puts (buf, &Font_14x15, 1);
-  SSD1306_UpdateScreen();*/
+  //HAL_UART_Receive_IT(&huart3, config, 4);
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  SSD1306_Fill(0);
-	  char buf[100];
-	  MPU6050_Read_Fifo(&mpu6050);
-
-
-	  SSD1306_GotoXY (0,0);
-	  sprintf (buf, "Ax=%.2f ", mpu6050.accelerometer.Ax);
-	  SSD1306_Puts (buf, &Font_14x15, 1);
-
-	  SSD1306_GotoXY (0,20);
-	  strcpy(buf, "");
-	  sprintf (buf, "Ay=%.2f ", mpu6050.accelerometer.Ay);
-	  SSD1306_Puts (buf, &Font_14x15, 1);
-
-	  SSD1306_GotoXY (0,40);
-	  strcpy(buf, "");
-	  sprintf (buf, "Az=%.2f ", mpu6050.accelerometer.Az);
-	  SSD1306_Puts (buf, &Font_14x15, 1);
-	  SSD1306_UpdateScreen();
-	  HAL_Delay(1);
 
     /* USER CODE END WHILE */
 
@@ -285,11 +263,11 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     if (huart->Instance == USART3) {
         // Echo received config
         HAL_UART_Transmit(&huart3, (uint8_t*)"Received: ", 10, 100);
-        HAL_UART_Transmit(&huart3, config, 4, 100);
+        //HAL_UART_Transmit(&huart3, config, 4, 100);
         HAL_UART_Transmit(&huart3, (uint8_t*)"\r\n", 2, 100);
 
         // to call interrupt again
-        HAL_UART_Receive_IT(&huart3, config, 4);
+        //HAL_UART_Receive_IT(&huart3, config, 4);
     }
 }
 
